@@ -14,7 +14,9 @@ object LayoutRegistry {
         val displayName: String,
         val main: KeyboardLayout,
         val symbols: KeyboardLayout,
-        val symbolsShift: KeyboardLayout
+        val symbolsShift: KeyboardLayout,
+        /** Gboard-style 4-row letters layout (see [GboardLayout]). */
+        val compact: KeyboardLayout
     )
 
     private val packs: MutableMap<String, LayoutPack> = mutableMapOf(
@@ -23,28 +25,32 @@ object LayoutRegistry {
             displayName = "English (US)",
             main = EnglishLayout.main(),
             symbols = EnglishLayout.symbols(),
-            symbolsShift = EnglishLayout.symbolsShift()
+            symbolsShift = EnglishLayout.symbolsShift(),
+            compact = GboardLayout.english()
         ),
         "hu_HU" to LayoutPack(
             id = "hu_HU",
             displayName = "Hungarian",
             main = HungarianLayout.main(),
             symbols = LayoutBlocks.symbols(),
-            symbolsShift = LayoutBlocks.symbolsShift()
+            symbolsShift = LayoutBlocks.symbolsShift(),
+            compact = GboardLayout.hungarian()
         ),
         "de_DE" to LayoutPack(
             id = "de_DE",
             displayName = "German",
             main = GermanLayout.main(),
             symbols = LayoutBlocks.symbols(),
-            symbolsShift = LayoutBlocks.symbolsShift()
+            symbolsShift = LayoutBlocks.symbolsShift(),
+            compact = GboardLayout.german()
         ),
         "es_ES" to LayoutPack(
             id = "es_ES",
             displayName = "Spanish",
             main = SpanishLayout.main(),
             symbols = LayoutBlocks.symbols(),
-            symbolsShift = LayoutBlocks.symbolsShift()
+            symbolsShift = LayoutBlocks.symbolsShift(),
+            compact = GboardLayout.spanish()
         )
     )
 

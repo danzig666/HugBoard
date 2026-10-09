@@ -81,6 +81,11 @@ class KeyboardView @JvmOverloads constructor(
     // editors where suggestions make sense (the IME service decides).
     private var suggestionBar: SuggestionBarView? = null
 
+    // Gboard-style toolbar (grid · suggestions · mic). Replaces
+    // [suggestionBar] in Gboard style and stays mounted for the whole
+    // session so the keyboard height never changes while typing.
+    private var gboardToolbar: GboardToolbarView? = null
+
     // Clipboard manager overlay.
     private var clipboardView: com.pckeyboard.ime.clipboard.ClipboardView? = null
     private val clipHistory = com.pckeyboard.ime.clipboard.ClipboardHistory(context)
@@ -132,11 +137,104 @@ class KeyboardView @JvmOverloads constructor(
             if (prefs.sideSplitEnabled) 0 else theme.backgroundColor
         )
         rebuild()
+        syncGboardToolbar()
         requestLayout()
+    }
+
+    /** Sizes taken from Gboard on a Galaxy Z Fold: the folded (cover)
+     *  screen's full-width keyboard and the unfolded screen's split one. */
+    private data class GboardMetrics(
+        val split: Boolean,
+        val rowDp: Float, val hGapDp: Float, val vGapDp: Float,
+        /** Gboard's bottom row is a little taller than the letter rows. */
+        val bottomRowExtraDp: Float,
+        val bottomPadDp: Float,
+        val toolbarDp: Float = 50f
+    )
+
+    private fun gboardMetrics(layout: KeyboardLayout): GboardMetrics = when {
+        layout.rows.any { row -> row.any { it.type == KeyType.SPACER } } ->
+            GboardMetrics(split = true, rowDp = 60f, hGapDp = 9f, vGapDp = 13.5f,
+                bottomRowExtraDp = 0.7f, bottomPadDp = 2f)
+        // Phone-sized screen turned sideways: flatter rows, like Gboard,
+        // so the app keeps some room above the keyboard.
+        resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE ->
+            GboardMetrics(split = false, rowDp = 42f, hGapDp = 5.4f, vGapDp = 7f,
+                bottomRowExtraDp = 0f, bottomPadDp = 2f, toolbarDp = 40f)
+        else ->
+            GboardMetrics(split = false, rowDp = 54f, hGapDp = 5.4f, vGapDp = 11f,
+                bottomRowExtraDp = 1.8f, bottomPadDp = 5.5f)
+    }
+
+    /** On the split keyboard Gboard lines the toolbar up with the keys'
+     *  outer edges: returns that inset as a fraction of the width, measured
+     *  to the outer edge of the first key. */
+    private fun gboardToolbarInset(layout: KeyboardLayout, metrics: GboardMetrics): Float {
+        if (!metrics.split) return 0f
+        val row = layout.rows.first()
+        val total = row.sumOf { it.widthWeight.toDouble() }.toFloat()
+        val margin = row.takeWhile { it.type == KeyType.SPACER }.sumOf { it.widthWeight.toDouble() }.toFloat()
+        val width = resources.displayMetrics.widthPixels.toFloat().coerceAtLeast(1f)
+        return margin / total + dp(metrics.hGapDp) / 2f / width
+    }
+
+    /** Mounts / refreshes / removes the Gboard toolbar to match the
+     *  current layout style, theme and metrics. */
+    private fun syncGboardToolbar() {
+        val layout = layoutData
+        val theme = theme
+        if (layout == null || theme == null || !layout.gboardStyle) {
+            gboardToolbar?.let { mainContainer.removeView(it) }
+            gboardToolbar = null
+            return
+        }
+        // The PC-style strip never coexists with the toolbar.
+        unmountSuggestionBar()
+        val metrics = gboardMetrics(layout)
+        val heightPx = dp(metrics.toolbarDp)
+        val existing = gboardToolbar
+        if (existing != null && existing.theme == theme) {
+            existing.configure(metrics.split, gboardToolbarInset(layout, metrics))
+            val lp = existing.layoutParams
+            if (lp.height != heightPx) {
+                lp.height = heightPx
+                existing.layoutParams = lp
+            }
+            return
+        }
+        val words = existing?.words ?: emptyList()
+        existing?.let { mainContainer.removeView(it) }
+        val bar = GboardToolbarView(
+            context, theme,
+            onPick = { word -> listener?.onSuggestionPicked(word) },
+            onMenu = { anchor -> showActionMenu(anchor) },
+            onMic = { listener?.onMenuAction(MenuAction.OpenVoiceInput) }
+        )
+        bar.setSuggestions(if (suggestionBarEnabled) words else emptyList())
+        bar.configure(metrics.split, gboardToolbarInset(layout, metrics))
+        gboardToolbar = bar
+        mainContainer.addView(bar, mainContainer.indexOfChild(rowsContainer),
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, heightPx))
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val mode = MeasureSpec.getMode(heightMeasureSpec)
+        val gLayout = layoutData?.takeIf { it.gboardStyle }
+        if (gLayout != null && (mode == MeasureSpec.UNSPECIFIED || mode == MeasureSpec.AT_MOST)) {
+            val m = gboardMetrics(gLayout)
+            val rowsPx = (dp(m.rowDp) * gLayout.rows.size + dp(m.bottomRowExtraDp) +
+                dp(m.bottomPadDp)) * prefs.heightScale
+            val extra = dp(POPUP_ZONE_DP) +
+                (if (emojiSearchHeader != null) dp(SEARCH_HEADER_DP) else 0) +
+                (if (gboardToolbar != null) dp(m.toolbarDp) else 0)
+            val targetHeight = rowsPx.toInt() + extra
+            val resolved = if (mode == MeasureSpec.AT_MOST) {
+                minOf(MeasureSpec.getSize(heightMeasureSpec), targetHeight)
+            } else targetHeight
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(resolved, MeasureSpec.EXACTLY))
+            return
+        }
         if (mode == MeasureSpec.UNSPECIFIED || mode == MeasureSpec.AT_MOST) {
             val rows = layoutData?.rows?.size ?: 5
             val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
@@ -200,6 +298,11 @@ class KeyboardView @JvmOverloads constructor(
         val side = (resources.displayMetrics.widthPixels * prefs.horizontalPadding).toInt()
         rowsContainer.setPadding(side, 0, side, 0)
 
+        if (layout.gboardStyle) {
+            buildGboardRows(layout, theme, side)
+            return
+        }
+
         if (prefs.sideSplitEnabled) {
             buildSideSplitRows(layout, theme)
             return
@@ -248,6 +351,43 @@ class KeyboardView @JvmOverloads constructor(
                     }
                     rowView.addView(spacer)
                 }
+            }
+            rowsContainer.addView(rowView)
+        }
+    }
+
+    /** Gboard rows: every key gets its share of the row by weight and
+     *  draws itself inset by Gboard's horizontal / vertical gaps, so a
+     *  tap anywhere in the row (gaps included) lands on the nearest key.
+     *  [KeyType.SPACER] keys become empty views (split keyboard gap). */
+    private fun buildGboardRows(layout: KeyboardLayout, theme: KeyboardTheme, side: Int) {
+        val m = gboardMetrics(layout)
+        val edge = if (m.split) 0 else dp(GBOARD_EDGE_DP)
+        rowsContainer.setPadding(side + edge, 0, side + edge, dp(m.bottomPadDp))
+        val hGap = dp(m.hGapDp).toFloat()
+        val vGap = dp(m.vGapDp).toFloat()
+        for ((index, row) in layout.rows.withIndex()) {
+            val rowWeight = if (index == layout.rows.lastIndex)
+                1f + m.bottomRowExtraDp / m.rowDp else 1f
+            val rowView = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 0, rowWeight
+                )
+            }
+            val totalWeight = row.sumOf { it.widthWeight.toDouble() }.toFloat()
+            for (key in row) {
+                val weight = key.widthWeight / totalWeight
+                if (key.type == KeyType.SPACER) {
+                    rowView.addView(makeGapView(weight))
+                    continue
+                }
+                rowView.addView(makeKeyView(key, theme, weight).apply {
+                    gboard = true
+                    gboardHGapPx = hGap
+                    gboardVGapPx = vGap
+                    gboardSplit = m.split
+                })
             }
             rowsContainer.addView(rowView)
         }
@@ -407,12 +547,12 @@ class KeyboardView @JvmOverloads constructor(
                 showTrackpad()
                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             }
-            KeyType.LANGUAGE_SWITCH -> {
+            KeyType.LANGUAGE_SWITCH, KeyType.EMOJI -> {
                 showActionMenu(view)
                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             }
             else -> {
-                val chars = view.key.popupChars ?: return
+                val chars = view.key.popupChars ?: if (view.key.hint != null) "" else return
                 showPopup(view, chars)
                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             }
@@ -463,7 +603,11 @@ class KeyboardView @JvmOverloads constructor(
         }
         dismissPopup()
         if (selected != null) {
-            val charKey = Key.char(selected)
+            // Shift applies to long-press letters too (Shift, then o → Ö).
+            val upper = selected.uppercase()
+            val text = if (view.key.type == KeyType.LETTER && modifiers.isShiftActive() &&
+                upper.length == selected.length) upper else selected
+            val charKey = Key.char(text)
             listener?.onKey(charKey, modifiers)
             modifiers.consumeAfterChar()
             refresh()
@@ -481,7 +625,7 @@ class KeyboardView @JvmOverloads constructor(
 
     var currentLanguageId: String = "en_US"
 
-    private fun showActionMenu(anchor: KeyView) {
+    private fun showActionMenu(anchor: View) {
         dismissActionMenu()
         val prefs = com.pckeyboard.ime.settings.KeyboardPrefs(context)
         val enabled = prefs.enabledLanguages
@@ -500,8 +644,13 @@ class KeyboardView @JvmOverloads constructor(
         // fixing before we re-expose the toggle. The MenuAction itself
         // stays in the sealed class so the wiring can be re-enabled
         // without a manifest change.
-        val items = langItems + listOf(
-            MenuItem(fnRowIcon, "Function row (Esc, F1…)", MenuAction.ToggleFunctionRow),
+        val layoutItems = if (prefs.isGboardStyle) listOf(
+            MenuItem("⌨", "PC keyboard layout", MenuAction.ToggleLayoutStyle)
+        ) else listOf(
+            MenuItem("⌨", "Gboard layout", MenuAction.ToggleLayoutStyle),
+            MenuItem(fnRowIcon, "Function row (Esc, F1…)", MenuAction.ToggleFunctionRow)
+        )
+        val items = langItems + layoutItems + listOf(
             MenuItem("🎤", "Voice input",       MenuAction.OpenVoiceInput),
             MenuItem("😀", "Emoji",            MenuAction.OpenEmoji),
             MenuItem("📋", "Clipboard",        MenuAction.OpenClipboard),
@@ -538,7 +687,7 @@ class KeyboardView @JvmOverloads constructor(
 
     /** Builds an [ActionMenuView] for [items] and mounts it anchored
      *  above [anchor], clamped to the keyboard bounds. */
-    private fun presentActionMenu(anchor: KeyView, items: List<MenuItem>) {
+    private fun presentActionMenu(anchor: View, items: List<MenuItem>) {
         val theme = theme ?: return
         val menu = ActionMenuView(context, items, theme) { action ->
             dismissActionMenu()
@@ -720,7 +869,10 @@ class KeyboardView @JvmOverloads constructor(
     /** Sets the per-editor gate. Called on every input session start. */
     fun setSuggestionBarVisible(visible: Boolean) {
         suggestionBarEnabled = visible
-        if (!visible) unmountSuggestionBar()
+        if (!visible) {
+            unmountSuggestionBar()
+            gboardToolbar?.setSuggestions(emptyList())
+        }
     }
 
     /**
@@ -733,6 +885,10 @@ class KeyboardView @JvmOverloads constructor(
      * the strip folds away, returning the space to the app.
      */
     fun setSuggestions(words: List<String>) {
+        gboardToolbar?.let { bar ->
+            bar.setSuggestions(if (suggestionBarEnabled) words else emptyList())
+            return
+        }
         if (!suggestionBarEnabled) {
             unmountSuggestionBar()
             return
@@ -856,9 +1012,20 @@ class KeyboardView @JvmOverloads constructor(
         } else null
         val rawOthers = listOfNotNull(shiftLabel) + chars.map { it.toString() }
         val others = rawOthers.filter { it != base }.distinct()
-        val leftCount = others.size / 2
-        val all = others.take(leftCount) + listOf(base) + others.drop(leftCount)
-        val baseIndex = leftCount
+        val hint = anchor.key.hint
+        // Gboard keys with a hint glyph open with the hint first and
+        // pre-selected (q → 1, a → @), followed by the accents; a straight
+        // release commits the hint.
+        val all: List<String>
+        val baseIndex: Int
+        if (hint != null) {
+            all = listOf(hint) + others.filter { it != hint }
+            baseIndex = 0
+        } else {
+            val leftCount = others.size / 2
+            all = others.take(leftCount) + listOf(base) + others.drop(leftCount)
+            baseIndex = leftCount
+        }
 
         val popup = KeyPopupView(context, all, baseIndex, theme)
         popup.selectedIndex = baseIndex
@@ -1006,6 +1173,8 @@ class KeyboardView @JvmOverloads constructor(
         const val POPUP_ZONE_DP = 90f
         /** Height of the emoji search overlay header (query + results strip). */
         const val SEARCH_HEADER_DP = 104f
+        /** Gboard style: side margin beyond half a key gap. */
+        const val GBOARD_EDGE_DP = 2f
         /** How long an empty suggestion strip lingers (blank) before it
          *  collapses — bridges word boundaries and thinking pauses so
          *  the keyboard doesn't bounce while typing. */

@@ -10,7 +10,10 @@ data class KeyboardLayout(
     val id: String,
     val displayName: String,
     val rows: List<List<Key>>,
-    val mode: LayoutMode = LayoutMode.MAIN
+    val mode: LayoutMode = LayoutMode.MAIN,
+    /** Render with Gboard look & feel: flat letter-coloured Space, only
+     *  Enter in the accent colour, drawn Shift arrow, key-press preview. */
+    val gboardStyle: Boolean = false
 )
 
 enum class LayoutMode {

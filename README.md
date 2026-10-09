@@ -17,6 +17,15 @@ Ctrl 🌐 Alt        space      123  ◀ ▼ ▶
 
 ## Highlights
 
+- **Gboard layout (default)** — a compact 4-row keyboard that looks like
+  Gboard key for key: `q w e r t z u i o p` with 1–0 hints, an indented
+  home row with `@ # $ _ & - + ( )` hints, `⇧ y x c v b n m ⌫`, and
+  `?123 , ☺ space . ⏎`. Long-press gives the hint first, then the
+  accents (o → 9 ö ó ő …). On the unfolded screen of a foldable it turns
+  into Gboard's split keyboard (g and v on both halves). A toolbar with
+  the menu, three suggestions and the mic sits on top, and the Gboard
+  Dark / Light themes match its colours. The full PC keyboard below is
+  one tap away (Settings → Keyboard layout, or the keyboard menu).
 - **Real PC layout** — F-row, Esc, Tab, Caps Lock, Ctrl + Alt + Win as actual
   modifiers (not toggles to a symbols page), arrow cluster with both ▲ above ▼
   and ◀ / ▶ flanking. Modifier presses become `KeyEvent` meta flags so

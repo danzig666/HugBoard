@@ -19,7 +19,15 @@ data class Key(
     val keyCode: Int = 0,
     val repeatable: Boolean = false,
     val sticky: Boolean = false,
-    val icon: String? = null
+    val icon: String? = null,
+    /** Small glyph drawn in the key's top-right corner (Gboard-style
+     *  digit hint on the top letter row). Long-press offers it first. */
+    val hint: String? = null,
+    /** Part of [widthWeight] on the left / right that is touchable but not
+     *  drawn — how Gboard indents the home row by half a key while still
+     *  letting a tap in the indent hit the edge key. */
+    val gapBefore: Float = 0f,
+    val gapAfter: Float = 0f
 ) {
     companion object {
         const val CODE_UNSPECIFIED = 0
@@ -43,15 +51,19 @@ data class Key(
             )
 
         fun letter(lower: String, alt: String? = null, popup: String? = null,
-                   weight: Float = 1f): Key =
+                   weight: Float = 1f, hint: String? = null,
+                   gapBefore: Float = 0f, gapAfter: Float = 0f): Key =
             Key(
                 code = lower.codePointAt(0),
                 label = lower,
                 shiftLabel = lower.uppercase(),
                 altLabel = alt,
                 popupChars = popup,
-                widthWeight = weight,
-                type = KeyType.LETTER
+                widthWeight = weight + gapBefore + gapAfter,
+                type = KeyType.LETTER,
+                hint = hint,
+                gapBefore = gapBefore,
+                gapAfter = gapAfter
             )
 
         fun fn(label: String, type: KeyType, keyCode: Int = 0, weight: Float = 1f,
@@ -98,5 +110,7 @@ enum class KeyType {
     LANGUAGE_SWITCH,
     EMOJI,
     SETTINGS,
-    HIDE
+    HIDE,
+    /** Empty, untouchable filler (Gboard split-keyboard centre gap). */
+    SPACER
 }

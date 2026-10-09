@@ -24,6 +24,7 @@ import com.pckeyboard.ime.dictionary.SuggestionEngine
 import com.pckeyboard.ime.dictionary.TrigramStore
 import com.pckeyboard.ime.dictionary.UserDictionary
 import com.pckeyboard.ime.layout.LayoutRegistry
+import com.pckeyboard.ime.layout.GboardLayout
 import com.pckeyboard.ime.layout.LayoutSelector
 import com.pckeyboard.ime.model.Key
 import com.pckeyboard.ime.model.KeyType
@@ -437,6 +438,20 @@ class PcKeyboardService : InputMethodService(), KeyboardView.Listener {
             else -> pack.main
         }
         val widthDp = (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+        if (kbPrefs.isGboardStyle) {
+            val letters = if (currentMode == LayoutMode.SYMBOLS || currentMode == LayoutMode.SYMBOLS_SHIFT)
+                base else pack.compact
+            // Unfolded foldable / tablet: Gboard's split keyboard. Keyed on
+            // the smallest width so a phone-sized (folded) screen stays
+            // full-width in landscape too.
+            val shaped = if (resources.configuration.smallestScreenWidthDp >=
+                LayoutSelector.FULL_WIDTH_DP_THRESHOLD) GboardLayout.split(letters) else letters
+            val gLayout = withEnterIcon(withSpaceCaption(shaped))
+                .copy(gboardStyle = true)
+            view.bind(gLayout, activeTheme())
+            preloadDictionaries()
+            return
+        }
         // If the user has flipped "show function row" in the globe menu,
         // keep the full PC layout even on narrow phones that would
         // otherwise drop the F-key row.
@@ -450,8 +465,12 @@ class PcKeyboardService : InputMethodService(), KeyboardView.Listener {
             kbPrefs.rightOfSpaceAction
         )
         view.bind(finalLayout, activeTheme())
-        // Keep the active language's dictionary warm so suggestions are
-        // ready the moment the user starts typing after a switch.
+        preloadDictionaries()
+    }
+
+    /** Keep the active language's dictionary warm so suggestions are
+     *  ready the moment the user starts typing after a switch. */
+    private fun preloadDictionaries() {
         if (kbPrefs.autocorrectMode != KeyboardPrefs.AUTOCORRECT_OFF) {
             DictionaryStore.preload(this, currentLayoutId)
             HunspellStore.preload(this, currentLayoutId)
@@ -494,6 +513,40 @@ class PcKeyboardService : InputMethodService(), KeyboardView.Listener {
             }
         }
         return layout.copy(rows = newRows)
+    }
+
+    /** Gboard's Space caption: the enabled languages' codes with the
+     *  active one first ("HU • EN"), or the language's own name when only
+     *  one is enabled. */
+    private fun withSpaceCaption(layout: KeyboardLayout): KeyboardLayout {
+        val enabled = LayoutRegistry.available.map { it.id }
+            .filter { it in kbPrefs.enabledLanguages && it != currentLayoutId }
+        val caption = if (enabled.isEmpty()) LayoutRegistry.get(currentLayoutId).compact.displayName
+            else (listOf(currentLayoutId) + enabled).joinToString(" • ") { languageCode(it) }
+        return layout.copy(rows = layout.rows.map { row ->
+            row.map { if (it.type == KeyType.SPACE) it.copy(label = caption) else it }
+        })
+    }
+
+    /** Gboard draws Enter as the editor's action: magnifier for Search,
+     *  paper plane for Send, tick for Done, arrow for Go / Next, ↵ else. */
+    private fun withEnterIcon(layout: KeyboardLayout): KeyboardLayout {
+        val info = currentInputEditorInfo
+        val opts = info?.imeOptions ?: 0
+        val icon = when {
+            info == null || isTerminalLikeEditor() ||
+                opts and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0 -> GboardLayout.ICON_ENTER
+            else -> when (opts and EditorInfo.IME_MASK_ACTION) {
+                EditorInfo.IME_ACTION_SEARCH -> GboardLayout.ICON_SEARCH
+                EditorInfo.IME_ACTION_SEND -> GboardLayout.ICON_SEND
+                EditorInfo.IME_ACTION_DONE -> GboardLayout.ICON_DONE
+                EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_NEXT -> GboardLayout.ICON_NEXT
+                else -> GboardLayout.ICON_ENTER
+            }
+        }
+        return layout.copy(rows = layout.rows.map { row ->
+            row.map { if (it.type == KeyType.ENTER) it.copy(icon = icon) else it }
+        })
     }
 
     /** Rewrites the LANGUAGE_SWITCH key's label so the globe shows the
@@ -1140,6 +1193,13 @@ class PcKeyboardService : InputMethodService(), KeyboardView.Listener {
             MenuAction.ToggleFunctionRow -> {
                 kbPrefs.showFunctionRow = !kbPrefs.showFunctionRow
                 bindCurrentLayout()
+            }
+            MenuAction.ToggleLayoutStyle -> {
+                kbPrefs.layoutStyle = if (kbPrefs.isGboardStyle) KeyboardPrefs.LAYOUT_STYLE_PC
+                    else KeyboardPrefs.LAYOUT_STYLE_GBOARD
+                currentMode = LayoutMode.MAIN
+                bindCurrentLayout()
+                keyboardView?.applySizingPrefs()
             }
             MenuAction.ToggleSideSplit -> {
                 kbPrefs.sideSplitEnabled = !kbPrefs.sideSplitEnabled

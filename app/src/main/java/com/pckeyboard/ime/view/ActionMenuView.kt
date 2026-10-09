@@ -206,6 +206,8 @@ sealed class MenuAction {
     object OpenSettings : MenuAction()
     /** Flip the "show function row on narrow screens" preference. */
     object ToggleFunctionRow : MenuAction()
+    /** Switch between the Gboard-style and the full PC keyboard. */
+    object ToggleLayoutStyle : MenuAction()
     /** Flip the "side-split" (left half + gap + right half) preference. */
     object ToggleSideSplit : MenuAction()
     /** Open the system speech-recognition overlay anchored to the IME. */

@@ -255,6 +255,16 @@ class SettingsActivity : AppCompatActivity() {
             binding.trackpadSensValue.text = formatSensitivity(v)
         })
 
+        // Overall shape: Gboard-style 4 rows (default) or the full PC keyboard.
+        binding.layoutStyleGroup.check(
+            if (prefs.isGboardStyle) R.id.layoutStyleGboard else R.id.layoutStylePc
+        )
+        binding.layoutStyleGroup.addOnButtonCheckedListener { _, id, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            prefs.layoutStyle = if (id == R.id.layoutStylePc) KeyboardPrefs.LAYOUT_STYLE_PC
+                else KeyboardPrefs.LAYOUT_STYLE_GBOARD
+        }
+
         // Right-of-Space slot: "123" (symbols), "😀" (emoji) or "Alt".
         val checkedId = when (prefs.rightOfSpaceAction) {
             KeyboardPrefs.RIGHT_OF_SPACE_EMOJI -> R.id.rightOfSpaceEmoji

@@ -65,5 +65,46 @@ object Themes {
         keySpacingDp = 3
     )
 
-    val builtIn: List<KeyboardTheme> = listOf(LIGHT, DARK, BLACK)
+    /** Colours sampled from Gboard's dark Material You keyboard: plain
+     *  keys on a dark grey board, blue-grey tinted function keys. */
+    val GBOARD_DARK = KeyboardTheme(
+        id = "gboard_dark",
+        name = "Gboard Dark",
+        isDark = true,
+        backgroundColor       = Color.parseColor("#2A2A2C"),
+        keyBackgroundColor    = Color.parseColor("#46454A"),
+        keyPressedColor       = Color.parseColor("#5E5D63"),
+        keyTextColor          = Color.parseColor("#E4E4E6"),
+        secondaryTextColor    = Color.parseColor("#BAB9BE"),
+        modifierKeyColor      = Color.parseColor("#3F4660"),
+        modifierTextColor     = Color.parseColor("#DCE2F0"),
+        accentColor           = Color.parseColor("#A8C7FA"),
+        accentTextColor       = Color.parseColor("#062E6F"),
+        dividerColor          = Color.parseColor("#5A595F"),
+        keyCornerRadiusDp = 8,
+        keyElevationDp = 0,
+        keySpacingDp = 4
+    )
+
+    /** Light counterpart of [GBOARD_DARK]. */
+    val GBOARD_LIGHT = KeyboardTheme(
+        id = "gboard_light",
+        name = "Gboard Light",
+        isDark = false,
+        backgroundColor       = Color.parseColor("#ECECF1"),
+        keyBackgroundColor    = Color.parseColor("#FFFFFF"),
+        keyPressedColor       = Color.parseColor("#D4D4DA"),
+        keyTextColor          = Color.parseColor("#1B1B1F"),
+        secondaryTextColor    = Color.parseColor("#5E5E64"),
+        modifierKeyColor      = Color.parseColor("#D3DAF0"),
+        modifierTextColor     = Color.parseColor("#1B2338"),
+        accentColor           = Color.parseColor("#0B57D0"),
+        accentTextColor       = Color.parseColor("#FFFFFF"),
+        dividerColor          = Color.parseColor("#C4C4CA"),
+        keyCornerRadiusDp = 8,
+        keyElevationDp = 0,
+        keySpacingDp = 4
+    )
+
+    val builtIn: List<KeyboardTheme> = listOf(GBOARD_DARK, GBOARD_LIGHT, LIGHT, DARK, BLACK)
 }

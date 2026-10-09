@@ -29,6 +29,10 @@
     <string name="settings_split_gap">Centre gap</string>
     <string name="settings_long_press_delay">Long-press delay</string>
     <string name="settings_long_press_delay_hint">Applies to every key. Lower = quicker popups &amp; trackpad; higher = fewer accidental triggers.</string>
+    <string name="settings_layout_style">Keyboard layout</string>
+    <string name="settings_layout_style_hint">Gboard: compact 4-row keyboard (split when unfolded). PC: full keyboard with F-keys, Ctrl, Alt and arrows.</string>
+    <string name="settings_layout_style_gboard">Gboard</string>
+    <string name="settings_layout_style_pc">PC</string>
     <string name="settings_right_of_space">Right-of-Space key</string>
     <string name="settings_right_of_space_hint">Pick what the slot directly to the right of Space does.</string>
     <string name="settings_right_of_space_symbols">123 Symbols</string>

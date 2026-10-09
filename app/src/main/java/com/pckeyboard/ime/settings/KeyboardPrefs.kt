@@ -162,6 +162,20 @@ class KeyboardPrefs(context: Context) {
         set(value) { prefs.edit().putBoolean(KEY_SHOW_FN_ROW, value).apply() }
 
     /**
+     * Overall keyboard shape:
+     *  - [LAYOUT_STYLE_GBOARD] (default) — compact 4-row phone keyboard that
+     *    looks like Gboard: 3 letter rows + `?123 , 🌐 space . ⏎`, digits as
+     *    long-press hints on the top row, accents on long-press.
+     *  - [LAYOUT_STYLE_PC] — the full 6-row PC keyboard (F-row, number row,
+     *    Tab / Caps / Ctrl / Alt, arrow cluster).
+     */
+    var layoutStyle: String
+        get() = prefs.getString(KEY_LAYOUT_STYLE, LAYOUT_STYLE_GBOARD) ?: LAYOUT_STYLE_GBOARD
+        set(value) { prefs.edit().putString(KEY_LAYOUT_STYLE, value).apply() }
+
+    val isGboardStyle: Boolean get() = layoutStyle == LAYOUT_STYLE_GBOARD
+
+    /**
      * Multiplier applied to the space-trackpad's cursor speed (both axes).
      * 1.0 keeps the analog curve's default; values below 1.0 slow the cursor
      * down for finer placement, values above 1.0 speed it up for long jumps.
@@ -232,6 +246,9 @@ class KeyboardPrefs(context: Context) {
         private const val KEY_SIDE_SPLIT = "kb_side_split_enabled"
         private const val KEY_RIGHT_OF_SPACE = "kb_right_of_space_action"
         private const val KEY_TRACKPAD_SENS = "kb_trackpad_sensitivity"
+        private const val KEY_LAYOUT_STYLE = "kb_layout_style"
+        const val LAYOUT_STYLE_GBOARD = "gboard"
+        const val LAYOUT_STYLE_PC = "pc"
         /** Weight of the big empty centre when sideSplit is on. */
         const val SIDE_SPLIT_GAP_WEIGHT = 5f
 

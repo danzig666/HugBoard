@@ -34,8 +34,32 @@ class ThemeRepository(context: Context) {
         PreferenceManager.getDefaultSharedPreferences(storeContext)
 
     fun getSelectedTheme(): KeyboardTheme {
-        val id = prefs.getString(KEY_SELECTED, Themes.LIGHT.id) ?: Themes.LIGHT.id
-        return getThemeById(id) ?: Themes.LIGHT
+        migrateToGboardThemeOnce()
+        val fallback = defaultTheme()
+        val id = prefs.getString(KEY_SELECTED, fallback.id) ?: fallback.id
+        return getThemeById(id) ?: fallback
+    }
+
+    /** Gboard Dark / Light following the system's dark mode. */
+    private fun defaultTheme(): KeyboardTheme {
+        val night = appContext.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        return if (night == android.content.res.Configuration.UI_MODE_NIGHT_YES)
+            Themes.GBOARD_DARK else Themes.GBOARD_LIGHT
+    }
+
+    /** One-time switch to the Gboard palette when the Gboard layout
+     *  arrived: a stock theme maps to its Gboard counterpart, while a
+     *  user-built custom theme is left alone. */
+    private fun migrateToGboardThemeOnce() {
+        if (prefs.getBoolean(KEY_GBOARD_MIGRATED, false)) return
+        val edit = prefs.edit().putBoolean(KEY_GBOARD_MIGRATED, true)
+        when (prefs.getString(KEY_SELECTED, null)) {
+            null -> {}
+            Themes.LIGHT.id -> edit.putString(KEY_SELECTED, Themes.GBOARD_LIGHT.id)
+            Themes.DARK.id, Themes.BLACK.id -> edit.putString(KEY_SELECTED, Themes.GBOARD_DARK.id)
+        }
+        edit.apply()
     }
 
     fun selectTheme(id: String) {
@@ -72,7 +96,7 @@ class ThemeRepository(context: Context) {
             editor.remove(k)
         }
         editor.apply()
-        if (prefs.getString(KEY_SELECTED, "") == id) selectTheme(Themes.LIGHT.id)
+        if (prefs.getString(KEY_SELECTED, "") == id) selectTheme(defaultTheme().id)
     }
 
     fun allThemes(): List<KeyboardTheme> = Themes.builtIn + listCustomThemes()
@@ -96,5 +120,6 @@ class ThemeRepository(context: Context) {
         private const val KEY_SELECTED = "selected_theme_id"
         private const val KEY_CUSTOM_IDS = "custom_theme_ids"
         private const val KEY_PREFIX = "theme_"
+        private const val KEY_GBOARD_MIGRATED = "kb_gboard_theme_migrated_v1"
     }
 }
