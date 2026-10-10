@@ -471,22 +471,34 @@ class PcKeyboardService : InputMethodService(), KeyboardView.Listener {
     /** Keep the active language's dictionary warm so suggestions are
      *  ready the moment the user starts typing after a switch. */
     private fun preloadDictionaries() {
-        if (kbPrefs.autocorrectMode != KeyboardPrefs.AUTOCORRECT_OFF) {
-            DictionaryStore.preload(this, currentLayoutId)
-            HunspellStore.preload(this, currentLayoutId)
-            BigramStore.preload(this, currentLayoutId)
-            TrigramStore.preload(this, currentLayoutId)
-            RerankerStore.preload(this, currentLayoutId)
-            // Bilingual trust needs the OTHER enabled language's word
-            // knowledge in memory too (the store LRUs hold two).
-            for (lang in kbPrefs.enabledLanguages) {
-                if (lang != currentLayoutId) {
-                    DictionaryStore.preload(this, lang)
-                    HunspellStore.preload(this, lang)
-                }
-            }
+        if (kbPrefs.autocorrectMode == KeyboardPrefs.AUTOCORRECT_OFF) return
+        val lang = currentLayoutId
+        // The strip only refreshes on input; when the dictionary arrives
+        // after the user has paused, show its suggestions right away.
+        val wasLoaded = DictionaryStore.peek(lang) != null
+        DictionaryStore.preload(this, lang) {
+            if (!wasLoaded && lang == currentLayoutId) updateSuggestions()
+        }
+        HunspellStore.preload(this, lang)
+        BigramStore.preload(this, lang)
+        TrigramStore.preload(this, lang)
+        RerankerStore.preload(this, lang)
+        // Bilingual trust needs ONE other language's word knowledge in
+        // memory too. The store LRUs hold only two languages, so warming
+        // every enabled language (all four by default) used to evict the
+        // ACTIVE one — leaving the keyboard with no suggestions at all.
+        bilingualPartner()?.let { other ->
+            DictionaryStore.preload(this, other)
+            HunspellStore.preload(this, other)
         }
     }
+
+    /** The enabled language kept loaded next to the active one for
+     *  bilingual trust: the first other enabled language in registry
+     *  order (English for a Hungarian user, Hungarian for an English one). */
+    private fun bilingualPartner(): String? =
+        LayoutRegistry.available.map { it.id }
+            .firstOrNull { it != currentLayoutId && it in kbPrefs.enabledLanguages }
 
     /** Rewrites the control-row "123" SYMBOL_SWITCH key into whatever the
      *  user picked for the slot to the right of Space (Settings or the

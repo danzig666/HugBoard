@@ -299,7 +299,7 @@ listed alongside the built-ins.
 
 ## In-app updater
 
-Polls `https://api.github.com/repos/9hm2/pcKeyboard/releases/latest` and
+Polls `https://api.github.com/repos/danzig666/HugBoard/releases/latest` and
 compares the release tag against `BuildConfig.VERSION_NAME`. A manual *Check
 now* in Settings hits the network unconditionally; automatic checks (via
 `WorkManager`) are throttled to the user-chosen 12 h / 24 h interval and

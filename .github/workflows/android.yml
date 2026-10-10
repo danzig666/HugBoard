@@ -110,6 +110,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
+          # Tag the commit that was actually built. Without this a new tag
+          # is created on the default branch, so a release built from any
+          # other branch pointed at the wrong source.
+          target_commitish: ${{ github.sha }}
           name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
           prerelease: ${{ inputs.prerelease }}

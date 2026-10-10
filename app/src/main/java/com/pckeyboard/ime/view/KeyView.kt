@@ -455,15 +455,50 @@ class KeyView(
             key.type == KeyType.LANGUAGE_SWITCH ||
             key.code == Key.CODE_RIGHT_OF_SPACE
 
+    // Gboard Space: sliding a finger sideways moves the text cursor, one
+    // character per [SWIPE_STEP_DP]; a slide never types a space.
+    private var swipeLastX = 0f
+    private var swipeStartX = 0f
+    private var swipeAccum = 0f
+    private var spaceSwiping = false
+
+    private fun swipesCursor(): Boolean = gboard && key.type == KeyType.SPACE
+
+    /** Returns true while the touch is a cursor swipe on Space. */
+    private fun trackSpaceSwipe(x: Float): Boolean {
+        if (!spaceSwiping) {
+            if (popupActive) return false
+            val slop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+            if (kotlin.math.abs(x - swipeStartX) <= slop) return false
+            spaceSwiping = true
+            cancelLongPressTimer()
+            swipeLastX = x
+            swipeAccum = 0f
+            return true
+        }
+        swipeAccum += x - swipeLastX
+        swipeLastX = x
+        val step = dp(SWIPE_STEP_DP)
+        val steps = (swipeAccum / step).toInt()
+        if (steps != 0) {
+            swipeAccum -= steps * step
+            listener?.onSpaceSwipe(this, steps)
+        }
+        return true
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 isDown = true
+                spaceSwiping = false
+                swipeStartX = event.x
                 listener?.onKeyDown(this)
                 if (canLongPress()) scheduleLongPress()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                if (swipesCursor() && trackSpaceSwipe(event.x)) return true
                 if (popupActive) {
                     listener?.onKeyPopupMove(this, event.rawX, event.rawY)
                 }
@@ -472,6 +507,11 @@ class KeyView(
             MotionEvent.ACTION_UP -> {
                 isDown = false
                 cancelLongPressTimer()
+                if (spaceSwiping) {
+                    spaceSwiping = false
+                    listener?.onKeyCancel(this)
+                    return true
+                }
                 if (popupActive) {
                     popupActive = false
                     listener?.onKeyPopupRelease(this)
@@ -483,6 +523,7 @@ class KeyView(
             }
             MotionEvent.ACTION_CANCEL -> {
                 isDown = false
+                spaceSwiping = false
                 cancelLongPressTimer()
                 if (popupActive) {
                     popupActive = false
@@ -520,6 +561,8 @@ class KeyView(
     companion object {
         private val GBOARD_LETTER_FACE: Typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         private val GBOARD_LABEL_FACE: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        /** Finger travel per character of cursor movement on Space. */
+        private const val SWIPE_STEP_DP = 10f
     }
 
     interface Listener {
@@ -530,5 +573,7 @@ class KeyView(
         fun onKeyPopupMove(view: KeyView, rawX: Float, rawY: Float)
         fun onKeyPopupRelease(view: KeyView)
         fun onKeyPopupCancel(view: KeyView)
+        /** Gboard Space swipe: move the cursor [steps] characters. */
+        fun onSpaceSwipe(view: KeyView, steps: Int)
     }
 }

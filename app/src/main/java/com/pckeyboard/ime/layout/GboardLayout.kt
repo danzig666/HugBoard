@@ -18,10 +18,20 @@ import com.pckeyboard.ime.model.LayoutMode
  *  - Control: ?123  ,  ☺  space  .  ⏎
  *
  * Long-press offers the hint first, then the accented letters
- * (o → 9 ö ó ő …). [split] turns any of these into Gboard's split
- * keyboard for the unfolded screen of a foldable.
+ * (o → 9 ö ó ő). Only the language's own accents are offered — the
+ * Hungarian and English layouts both carry exactly the Hungarian set
+ * (á é í ó ö ő ú ü ű), German and Spanish only theirs, so no foreign
+ * letters clutter the popups. [split] turns any of these into Gboard's
+ * split keyboard for the unfolded screen of a foldable.
  */
 object GboardLayout {
+
+    // The Hungarian accented letters, per base vowel.
+    private const val HU_A = "á"
+    private const val HU_E = "é"
+    private const val HU_I = "í"
+    private const val HU_O = "öóő"
+    private const val HU_U = "üúű"
 
     private val DIGITS = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
     private val HOME_HINTS = listOf("@", "#", "$", "_", "&", "-", "+", "(", ")")
@@ -72,16 +82,16 @@ object GboardLayout {
         "hu_HU_gboard", "Magyar",
         listOf(
             row(listOf(
-                L("q"), L("w"), L("e", "éëèêē"), L("r"), L("t"),
-                L("z", "žźż"), L("u", "üúűùûū"), L("i", "íìîïī"), L("o", "öóőòôõø"), L("p")
+                L("q"), L("w"), L("e", HU_E), L("r"), L("t"),
+                L("z"), L("u", HU_U), L("i", HU_I), L("o", HU_O), L("p")
             ), DIGITS),
             row(listOf(
-                L("a", "áàâäãåæ"), L("s", "ßš"), L("d"), L("f"), L("g"),
-                L("h"), L("j"), L("k"), L("l", "ł")
+                L("a", HU_A), L("s"), L("d"), L("f"), L("g"),
+                L("h"), L("j"), L("k"), L("l")
             ), HOME_HINTS, indent = 0.5f),
             shiftRow(listOf(
-                L("y", "ý"), L("x"), L("c", "čćç"), L("v"),
-                L("b"), L("n", "ñń"), L("m")
+                L("y"), L("x"), L("c"), L("v"),
+                L("b"), L("n"), L("m")
             ), total = 10f),
             controlRow(10f)
         )
@@ -91,16 +101,16 @@ object GboardLayout {
         "en_US_gboard", "English",
         listOf(
             row(listOf(
-                L("q"), L("w"), L("e", "éèêëē"), L("r"), L("t"),
-                L("y", "ýÿ"), L("u", "úüùûū"), L("i", "íìîïī"), L("o", "óöòôõøœ"), L("p")
+                L("q"), L("w"), L("e", HU_E), L("r"), L("t"),
+                L("y"), L("u", HU_U), L("i", HU_I), L("o", HU_O), L("p")
             ), DIGITS),
             row(listOf(
-                L("a", "áàâäãåæ"), L("s", "ßš"), L("d"), L("f"), L("g"),
+                L("a", HU_A), L("s"), L("d"), L("f"), L("g"),
                 L("h"), L("j"), L("k"), L("l")
             ), HOME_HINTS, indent = 0.5f),
             shiftRow(listOf(
-                L("z"), L("x"), L("c", "çćč"), L("v"),
-                L("b"), L("n", "ñń"), L("m")
+                L("z"), L("x"), L("c"), L("v"),
+                L("b"), L("n"), L("m")
             ), total = 10f),
             controlRow(10f)
         )
@@ -110,16 +120,16 @@ object GboardLayout {
         "de_DE_gboard", "Deutsch",
         listOf(
             row(listOf(
-                L("q"), L("w"), L("e", "éèêëė"), L("r"), L("t"),
-                L("z"), L("u", "úùûū"), L("i", "íìîï"), L("o", "óòôõœø"), L("p"), L("ü")
+                L("q"), L("w"), L("e"), L("r"), L("t"),
+                L("z"), L("u", "ü"), L("i"), L("o", "ö"), L("p"), L("ü")
             ), DIGITS),
             row(listOf(
-                L("a", "áàâãåæ"), L("s", "ßśš"), L("d"), L("f"), L("g"),
+                L("a", "ä"), L("s", "ß"), L("d"), L("f"), L("g"),
                 L("h"), L("j"), L("k"), L("l"), L("ö"), L("ä")
             ), HOME_HINTS),
             shiftRow(listOf(
-                L("y"), L("x"), L("c", "çćč"), L("v"),
-                L("b"), L("n", "ñń"), L("m")
+                L("y"), L("x"), L("c"), L("v"),
+                L("b"), L("n"), L("m")
             ), total = 11f),
             controlRow(11f)
         )
@@ -129,16 +139,16 @@ object GboardLayout {
         "es_ES_gboard", "Español",
         listOf(
             row(listOf(
-                L("q"), L("w"), L("e", "éèêë"), L("r"), L("t"),
-                L("y"), L("u", "úüùû"), L("i", "íïìî"), L("o", "óòöôõº"), L("p")
+                L("q"), L("w"), L("e", "é"), L("r"), L("t"),
+                L("y"), L("u", "úü"), L("i", "í"), L("o", "ó"), L("p")
             ), DIGITS),
             row(listOf(
-                L("a", "áàâäãåªæ"), L("s"), L("d"), L("f"), L("g"),
+                L("a", "á"), L("s"), L("d"), L("f"), L("g"),
                 L("h"), L("j"), L("k"), L("l"), L("ñ")
             ), HOME_HINTS),
             shiftRow(listOf(
-                L("z"), L("x"), L("c", "çćč"), L("v"),
-                L("b"), L("n", "ńñ"), L("m")
+                L("z"), L("x"), L("c"), L("v"),
+                L("b"), L("n", "ñ"), L("m")
             ), total = 10f),
             controlRow(10f)
         )

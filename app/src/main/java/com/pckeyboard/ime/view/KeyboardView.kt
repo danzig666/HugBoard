@@ -544,7 +544,10 @@ class KeyboardView @JvmOverloads constructor(
         }
         when (view.key.type) {
             KeyType.SPACE -> {
-                showTrackpad()
+                // Gboard: long-press Space switches language (sideways
+                // swipes move the cursor instead). PC layout: trackpad.
+                if (layoutData?.gboardStyle == true) switchLanguageFromSpace(view)
+                else showTrackpad()
                 view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             }
             KeyType.LANGUAGE_SWITCH, KeyType.EMOJI -> {
@@ -615,6 +618,11 @@ class KeyboardView @JvmOverloads constructor(
         // else: silently dismiss — the user slid off and released, no commit.
     }
 
+    override fun onSpaceSwipe(view: KeyView, steps: Int) {
+        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        listener?.onCursorMove(steps, 0)
+    }
+
     override fun onKeyPopupCancel(view: KeyView) {
         if (trackpadActive) { endTrackpad(); return }
         if (actionMenuView != null) { dismissActionMenu(); return }
@@ -625,12 +633,43 @@ class KeyboardView @JvmOverloads constructor(
 
     var currentLanguageId: String = "en_US"
 
+    /** Enabled language packs, the active one first. */
+    private fun enabledLanguagesCurrentFirst(): List<com.pckeyboard.ime.layout.LayoutRegistry.LayoutPack> {
+        val enabled = prefs.enabledLanguages
+        return com.pckeyboard.ime.layout.LayoutRegistry.available
+            .filter { it.id in enabled }
+            .sortedBy { if (it.id == currentLanguageId) 0 else 1 }
+    }
+
+    /** Long-press on Space (Gboard style). With two languages it simply
+     *  flips to the other one; with more it opens a language picker —
+     *  active language on top — that supports slide-to-select. */
+    private fun switchLanguageFromSpace(anchor: KeyView) {
+        val langs = enabledLanguagesCurrentFirst()
+        when {
+            langs.size < 2 -> return
+            langs.size == 2 -> {
+                val next = langs.first { it.id != currentLanguageId }.id
+                // Posted: switching rebuilds the rows, which must not
+                // happen inside the long-press callback of a key that is
+                // about to be removed.
+                handler.post { listener?.onMenuAction(MenuAction.SwitchLanguage(next)) }
+            }
+            else -> presentActionMenu(anchor, langs.map { pack ->
+                MenuItem(
+                    icon = "🌐",
+                    label = "${com.pckeyboard.ime.service.languageCode(pack.id)} — ${pack.displayName}",
+                    action = MenuAction.SwitchLanguage(pack.id),
+                    isCurrent = pack.id == currentLanguageId
+                )
+            })
+        }
+    }
+
     private fun showActionMenu(anchor: View) {
         dismissActionMenu()
         val prefs = com.pckeyboard.ime.settings.KeyboardPrefs(context)
-        val enabled = prefs.enabledLanguages
-        val langItems = com.pckeyboard.ime.layout.LayoutRegistry.available
-            .filter { it.id in enabled }
+        val langItems = enabledLanguagesCurrentFirst()
             .map { pack ->
                 MenuItem(
                     icon = "🌐",
