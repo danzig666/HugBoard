@@ -733,23 +733,30 @@ class PcKeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         val (word, prevWord, prev2Word) = currentWordWithContext()
         if (word.isEmpty()) {
-            // Right after an auto-correction the original leads the
-            // strip — one tap takes it back (the Samsung affordance).
+            // Right after an auto-correction the original is offered for a
+            // one-tap revert (the Samsung affordance) — second in the list,
+            // so the most likely next word keeps the top spot (the centre
+            // slot of the Gboard toolbar).
             val revert = pendingRevert
             val predictions = predictNext(dict, prevWord, prev2Word)
             keyboardView?.setSuggestions(
-                if (revert != null) (listOf(revert.first) + predictions).distinct()
+                if (revert != null)
+                    (predictions.take(1) + revert.first + predictions.drop(1)).distinct()
                 else predictions
             )
             return
         }
+        val result = newEngine(dict).suggest(
+            word, com.pckeyboard.ime.view.SuggestionBarView.MAX_SUGGESTIONS,
+            prevWord, prev2Word
+        )
+        // The word auto-correction would commit is the engine's verdict on
+        // what was meant: lead with it, so it is what the centre slot shows.
+        val best = result.autoReplace
         keyboardView?.setSuggestions(
-            newEngine(dict)
-                .suggest(
-                    word, com.pckeyboard.ime.view.SuggestionBarView.MAX_SUGGESTIONS,
-                    prevWord, prev2Word
-                )
-                .suggestions
+            if (best != null) (listOf(best) + result.suggestions).distinct()
+                .take(com.pckeyboard.ime.view.SuggestionBarView.MAX_SUGGESTIONS)
+            else result.suggestions
         )
     }
 
